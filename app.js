@@ -1,7 +1,13 @@
 require('dotenv').config();
 
-const line = require('@line/bot-sdk');
 const express = require('express');
+const line = require('@line/bot-sdk');
+const { Configuration, OpenAIApi } = require("openai");
+
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
 
 // create LINE SDK config from env variables
 const config = {
@@ -29,14 +35,26 @@ app.post('/callback', line.middleware(config), (req, res) => {
 });
 
 // event handler
-function handleEvent(event) {
+async function handleEvent(event) {
   if (event.type !== 'message' || event.message.type !== 'text') {
     // ignore non-text-message event
     return Promise.resolve(null);
   }
 
+  const { data } = await openai.createChatCompletion({
+    model: "text-davinci-003",
+    messages: [
+      {
+        role: 'user',
+        content: event.message.text,
+      }
+    ],
+    max_tokens: 500,
+  });
+
   // create a echoing text message
-  const echo = { type: 'text', text: event.message.text };
+  const [choices] = data.choices;
+  const echo = { type: 'text', text: choices.message.content.trim() || '抱歉，我沒有話可說了。' };
 
   // use reply API
   return client.replyMessage(event.replyToken, echo);
